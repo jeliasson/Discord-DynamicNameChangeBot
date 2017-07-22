@@ -4,9 +4,14 @@
   "description": "",
   "main": "app.js",
   "dependencies": {
+    "bufferutil": "^3.0.2",
     "discord.js": "^11.1.0",
     "isset": "^1.0.4",
-    "opusscript": "^0.0.3"
+    "md5": "^2.2.1",
+    "opusscript": "^0.0.3",
+    "random-string": "^0.2.0",
+    "uptimer": "^0.1.2",
+    "uws": "^8.14.0"
   },
   "devDependencies": {},
   "scripts": {
@@ -22,8 +27,5 @@
   "bugs": {
     "url": "https://github.com/jeliasson/Discord-DynamicNameChangeBot/issues"
   },
-  "homepage": "https://github.com/jeliasson/Discord-DynamicNameChangeBot#readme",
-  "dependencies": {
-    "discord.js": "^11.1.0"
-  }
+  "homepage": "https://github.com/jeliasson/Discord-DynamicNameChangeBot#readme"
 }

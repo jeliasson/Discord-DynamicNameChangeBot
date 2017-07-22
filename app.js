@@ -1,9 +1,23 @@
 // Requires
 var Discord = require('discord.js');
 var isset = require('isset');
+var md5 = require('md5');
+var rs = require('random-string');
+var uptimer = require('uptimer');
 
 // Application
 var App = {
+
+    instance: {
+        id: null,
+        uptime: null,
+        keepalive: {
+            enabled: true,
+            interval: 60,
+            count: 0
+        }
+    },
+
     token: '<Discord Bot Token>',
 
     // Discord
@@ -21,6 +35,9 @@ var App = {
 
     // Run
     run: function(options, callback) {
+        // Generate Application instance id
+        App.instance.id = md5(rs()).substring(0, 5);
+        console.log('** Starting instance (' + App.instance.id + ')');
 
         // Construct App.client
         App.client = new Discord.Client();
@@ -30,7 +47,7 @@ var App = {
 
         // Client ready
         App.client.on('ready', function() {
-            console.log('Logged in as ' + App.client.user.tag);
+            console.log('** Logged in as ' + App.client.user.tag);
 
             // Set App.client information
             App.client.user.setGame('God');
@@ -169,15 +186,35 @@ var App = {
         console.log('<= ' + message.author.username + ': ' + message.content);
 
         // Ping, Pong!
-        if (message.content === 'ping') {
-            message.reply('Pong!');
+        if (message.content === 'help') {
+            message.reply('[' + App.instance.id + '] Available commands: ping, uptime, restart, debug');
 
+            return;
+        }
+
+        // Ping, Pong!
+        if (message.content === 'ping') {
+            message.reply('[' + App.instance.id + '] Pong!');
+
+            return;
+        }
+
+        // Uptime
+        if (message.content === 'uptime') {
+            message.reply('[' + App.instance.id + '] ' + App.instance.uptime);
+
+            return;
+        }
+
+        // Debug
+        if (message.content === 'debug') {
+            message.reply('[' + App.instance.id + '] ' + ' Debug Information\n===============================\nApp.instance.id = ' + App.instance.id + '\nApp.instance.uptime = ' + App.instance.uptime + '\nApp.instance.keepalive.count = ' + App.instance.keepalive.count + '\nprocess.env.COMPUTERNAME = ' + process.env.COMPUTERNAME);
             return;
         }
 
         // Restart Bot
         if (message.content === 'restart') {
-            message.reply('Restarting...');
+            message.reply('[' + App.instance.id + '] Restarting...');
 
             // Destory (logout App.client)
             App.client.destroy();
@@ -194,3 +231,16 @@ var App = {
 
 // Run Application
 App.run();
+
+// Set Application uptime on interval
+setInterval(function() {
+    App.instance.uptime = Math.round(uptimer.getAppUptime(), 0) + ' seconds';
+}, 1000);
+
+// Send keep-alive
+setInterval(function() {
+    if (App.instance.keepalive.enabled) {
+        App.instance.keepalive.count = App.instance.keepalive.count + 1;
+        console.log('** Keep-Alive ' + App.instance.keepalive.count + '/' + App.instance.keepalive.interval);
+    }
+}, App.instance.keepalive.interval * 1000);
