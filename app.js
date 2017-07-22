@@ -185,7 +185,7 @@ var App = {
                     } else if (
                         (presenceProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage)
                         ||
-                        (presenceProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage-1 && channelParticipants == 2)
+                        (presenceProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage-1 && channelParticipants >= 2)
                     ) {
                         // Let's do some presence rewrite, if nessesary
                         if (presence == '.none') presence = App.DynamicChannelName.defaultChannelName;
