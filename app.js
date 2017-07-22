@@ -4,24 +4,25 @@ var isset = require('isset');
 var md5 = require('md5');
 var rs = require('random-string');
 var uptimer = require('uptimer');
+var checksum = require('checksum');
+var path = require('path');
 
 // Application
 var App = {
-
+    version: '0.1.0',
     instance: {
-        id: null,
-        uptime: null,
         keepalive: {
             enabled: true,
-            interval: 60,
-            count: 0
+            interval: 60
         }
     },
 
-    token: '<Discord Bot Token>',
+    token: '',
 
     // Discord
-    client: {},
+    Discord: {
+        client: {},
+    },
 
     // Dynamic Channel Name
     DynamicChannelName: {
@@ -35,22 +36,22 @@ var App = {
 
     // Run
     run: function(options, callback) {
-        // Generate Application instance id
-        App.instance.id = md5(rs()).substring(0, 5);
-        console.log('** Starting instance (' + App.instance.id + ')');
 
-        // Construct App.client
-        App.client = new Discord.Client();
+        // Setup Application
+        App.setup();
+
+        // Construct App.Discord.client
+        App.Discord.client = new Discord.Client();
 
         // Login using token
-        App.client.login(App.token);
+        App.Discord.client.login(App.token);
 
         // Client ready
-        App.client.on('ready', function() {
-            console.log('** Logged in as ' + App.client.user.tag);
+        App.Discord.client.on('ready', function() {
+            console.log('** Logged in as ' + App.Discord.client.user.tag);
 
-            // Set App.client information
-            App.client.user.setGame('God');
+            // Set App.Discord.client information
+            App.Discord.client.user.setGame('God');
 
             // Run callback
             if (typeof callback == "function") {
@@ -61,33 +62,72 @@ var App = {
         /*
          * Presence Event
          */
-        App.client.on('presenceUpdate', function(statusBefore, statusAfter) {
+        App.Discord.client.on('presenceUpdate', function(statusBefore, statusAfter) {
 
-            App.handleDynamicChannelName(App.client, statusAfter);
+            App.handleDynamicChannelName(App.Discord.client, statusAfter);
         });
 
         /*
          * Voice
          */
-         App.client.on('voiceStateUpdate', function(VoiceChannel, User) {
+         App.Discord.client.on('voiceStateUpdate', function(VoiceChannel, User) {
 
-             App.handleDynamicChannelName(App.client, VoiceChannel); // Emitted everytime voice state change
+             App.handleDynamicChannelName(App.Discord.client, VoiceChannel); // Emitted everytime voice state change
          });
 
         /*
          * Message Event
          */
-        App.client.on('message', function (message) {
+        App.Discord.client.on('message', function (message) {
 
-            App.handleMessage(App.client, message);
+            App.handleMessage(App.Discord.client, message);
         });
 
+    },
+
+    setup: function() {
+        // Only run once
+        if (isset(App.instance.setupCompleted)) return;
+
+        console.info('** Starting instance');
+
+        // Application file name
+        App.instance.file = path.basename(__filename);
+
+        // Application instance id
+        App.instance.id = '#' + md5(rs()).substring(0, 5);
+
+        // Application checksum
+        App.instance.checksum = checksum.file(path.basename(__filename), function(err, checksum) {
+            if (err) console.warn(err);
+
+            App.instance.checksum = checksum;
+
+            console.info('** Instance id ' + App.instance.id + ' on checksum ' + App.instance.checksum);
+        });
+
+        // Application uptime
+        App.instance.uptime = 0;
+        setInterval(function() {
+            App.instance.uptime = Math.round(uptimer.getAppUptime(), 0) + ' seconds';
+        }, 1000);
+
+        // Keep-alive
+        App.instance.keepalive.count = 0;
+        setInterval(function() {
+            if (App.instance.keepalive.enabled) {
+                App.instance.keepalive.count++;
+                console.info('** Keep-Alive ' + App.instance.keepalive.count + '/' + App.instance.keepalive.interval);
+            }
+        }, App.instance.keepalive.interval * 1000);
+
+        App.instance.setupCompleted = true;
     },
 
     // Handle Dynamic Channel Name
     handleDynamicChannelName: function(client, Channel) {
         // Process all channels in the guild
-        App.client.channels.forEach(function(channel) {
+        App.Discord.client.channels.forEach(function(channel) {
             var presenceStats = [];
             presenceStats['.none'] = 0;
 
@@ -208,16 +248,17 @@ var App = {
 
         // Debug
         if (message.content === 'debug') {
-            message.reply('[' + App.instance.id + '] ' + ' Debug Information\n===============================\nApp.instance.id = ' + App.instance.id + '\nApp.instance.uptime = ' + App.instance.uptime + '\nApp.instance.keepalive.count = ' + App.instance.keepalive.count + '\nprocess.env.COMPUTERNAME = ' + process.env.COMPUTERNAME);
+            message.reply('[' + App.instance.id + '] ' + ' Debug Information\n========================================\n\n# App\nVersion: ' + App.version + '\n\n# Instance\nId: ' + App.instance.id + '\nChecksum: ' + App.instance.checksum + '\nFile: ' + App.instance.file + '\nUptime = ' + App.instance.uptime + '\nKeep-Alive Count: ' + App.instance.keepalive.count + '\nKeep-Alive Interval: ' + App.instance.keepalive.interval + '\n\n# Processes Environment\nComputer Name: ' + process.env.COMPUTERNAME + '\n\n========================================');
+
             return;
         }
 
         // Restart Bot
         if (message.content === 'restart') {
-            message.reply('[' + App.instance.id + '] Restarting...');
+            message.reply('[' + App.instance.id + '] ' + ' Restarting...\n===============================\nYou may want to repool by requesting http://jeliasson-discord-bot.azurewebsites.net/');
 
-            // Destory (logout App.client)
-            App.client.destroy();
+            // Destory (logout App.Discord.client)
+            App.Discord.client.destroy();
 
             // Delay reboot
             setTimeout(function() {
@@ -231,16 +272,3 @@ var App = {
 
 // Run Application
 App.run();
-
-// Set Application uptime on interval
-setInterval(function() {
-    App.instance.uptime = Math.round(uptimer.getAppUptime(), 0) + ' seconds';
-}, 1000);
-
-// Send keep-alive
-setInterval(function() {
-    if (App.instance.keepalive.enabled) {
-        App.instance.keepalive.count = App.instance.keepalive.count + 1;
-        console.log('** Keep-Alive ' + App.instance.keepalive.count + '/' + App.instance.keepalive.interval);
-    }
-}, App.instance.keepalive.interval * 1000);
