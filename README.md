@@ -13,5 +13,8 @@ This is a [Discord Bot](https://discordapp.com/developers/docs/topics/oauth2) us
 2. Define settings in ```app.js```, section ```DynamicChannelName```.
 3. Run ```node start```.
 
+## Demo
+Join the [Demo Discord Guild](https://discord.gg/23qkAvh). 
+
 ## Contribute
-Feel free to contribute and send Pull Request.
+Feel free to contribute and send your Pull Requests!
