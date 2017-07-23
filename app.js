@@ -1,4 +1,4 @@
-const VERSION = '0.4.1';
+const VERSION = '0.4.2';
 
 var Discord = require('discord.js');
 var env = require('node-env-file');
