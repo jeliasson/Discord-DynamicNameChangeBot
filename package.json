@@ -5,10 +5,14 @@
   "main": "app.js",
   "dependencies": {
     "bufferutil": "^3.0.2",
+    "checksum": "^0.1.1",
     "discord.js": "^11.1.0",
+    "empty": "^0.10.1",
     "isset": "^1.0.4",
     "md5": "^2.2.1",
+    "node-env-file": "^0.1.8",
     "opusscript": "^0.0.3",
+    "path": "^0.12.7",
     "random-string": "^0.2.0",
     "uptimer": "^0.1.2",
     "uws": "^8.14.0"
