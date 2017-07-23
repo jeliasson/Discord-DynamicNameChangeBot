@@ -1,4 +1,4 @@
-const VERSION = '0.4.2';
+const VERSION = '0.4.3';
 
 var Discord = require('discord.js');
 var env = require('node-env-file');
@@ -14,7 +14,7 @@ var App = {
 
     // Discord
     Discord: {
-        presence: 'Handyman',                        // Presence to display on the bot
+        presence: 'Hotel',                        // Presence to display on the bot
         client: {},
     },
 
