@@ -9,8 +9,9 @@ This is a [Discord Bot](https://discordapp.com/developers/docs/topics/oauth2) us
 
 ### Installation
 1. Clone this repository ```https://github.com/jeliasson/Discord-DynamicNameChangeBot.git```.
-2. Define token and settings in app.js.
-3. Run ```node .\app.js```.
+2. Define ```DISCORD_TOKEN``` in ```.env```.
+2. Define settings in ```app.js```, section ```DynamicChannelName```.
+3. Run ```node start```.
 
 ## Contribute
 Feel free to contribute and send Pull Request.

@@ -1,6 +1,7 @@
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 
 var Discord = require('discord.js');
+var env = require('node-env-file');
 var isset = require('isset');
 var empty = require('empty');
 var md5 = require('md5');
@@ -13,20 +14,20 @@ var App = {
 
     // Discord
     Discord: {
-        token: '',                              // Discord Bot Token
         presence: 'God',                        // Presence to display on the bot
         client: {},
     },
 
     // Dynamic Channel Name
     DynamicChannelName: {
-        enabled: true,                          // Enable keep-alive console log
+        enabled: true,                          // Enable Dynamic Channel Name (dry-run or not)
         channelPrefix: '~ ',                    // Only process channels with this prefix
         defaultChannelName: 'Room',             // Default channel name
         defaultChannelNameEmpty: 'Room',        // Default empty channel name
         minPresenceDominanceProcentage: 50,     // Minimum procentage condition before changing channel name
-        minParticipant: 0,                      // Minimum of participant in a channel before changing channel name,
+        minParticipant: 0,                      // Minimum of participant in a channel before changing channel name
         maxChannelSpawn: 10,                    // @todo
+        maxChannelNameLength: 14,               // Maximum generated channel name length (excluding prefix and room number)
     },
 
     // Logger
@@ -56,8 +57,17 @@ var App = {
         // Setup Application
         App.setup();
 
-        // Construct App.Discord.client
+        // Construct Discord.client()
         App.Discord.client = new Discord.Client();
+
+        // Discord token
+        App.Discord.token = (process.env.DISCORD_TOKEN) ? process.env.DISCORD_TOKEN : false;
+
+        if (!App.Discord.token) {
+            App.log('!! Discord token is not defined (DISCORD_TOKEN).');
+
+            process.exit();
+        }
 
         // Login using token
         App.Discord.client.login(App.Discord.token);
@@ -106,6 +116,9 @@ var App = {
         // Only run once
         if (isset(App.Discord.setupCompleted)) return;
 
+        // Process environment variables
+        env(__dirname + '/.env');
+
         // Application logger
         App.log = function (data = null, options = null) {
             options = Object.assign({}, {
@@ -153,7 +166,6 @@ var App = {
 
         App.instance.setupCompleted = true;
     },
-
 
     channelProcessing: function(client, Channel) {
 
@@ -235,6 +247,9 @@ var App = {
                         // Do nothing
                         suggestion.channelName = App.DynamicChannelName.defaultChannelName;
                     }
+
+                    // Make channel name shorter if nessesary
+                    suggestion.channelName = (suggestion.channelName.length > App.DynamicChannelName.maxChannelNameLength) ? suggestion.channelName.substring(0, App.DynamicChannelName.maxChannelNameLength) + '...' : suggestion.channelName;
 
                     // Final name generator
                     var nameGenerator = {};
