@@ -1,4 +1,4 @@
-const VERSION = '0.4.5';
+const VERSION = '0.4.6';
 
 var Discord = require('discord.js');
 var env = require('node-env-file');
@@ -292,6 +292,7 @@ App.DynamicChannelName.process = function(client, Channel) {
                     if (presence.currentName == '.none') presence.currentName = App.DynamicChannelName.defaultChannelName;
                     if (presence.currentName == 'iexplore') presence.currentName = 'Silly Goose!';
                     if (presence.currentName == 'Project Argo (Prototype)') presence.currentName = 'Argo';
+                    if (presence.currentName == 'Unity') presence.currentName = 'Programming';
 
                     suggestion.channelName = presence.currentName;
 
