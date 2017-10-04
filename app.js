@@ -289,10 +289,15 @@ App.DynamicChannelName.process = function(client, Channel) {
                     (presence.highestProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage-1 && channelParticipants >= 2)
                 ) {
                     // Let's do some presence rewrite, if nessesary
-                    if (presence.currentName == '.none') presence.currentName = App.DynamicChannelName.defaultChannelName;
                     if (presence.currentName == 'iexplore') presence.currentName = 'Silly Goose!';
                     if (presence.currentName == 'Project Argo (Prototype)') presence.currentName = 'Argo';
                     if (presence.currentName == 'Unity') presence.currentName = 'Programming';
+                    
+                    // Default to none
+                    if (presence.currentName == 'wallpaper_engine') presence.currentName = '.none';
+                    
+                    // If we have none, let's grab the default channel name
+                    if (presence.currentName == '.none') presence.currentName = App.DynamicChannelName.defaultChannelName;
 
                     suggestion.channelName = presence.currentName;
 
