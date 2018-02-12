@@ -295,6 +295,7 @@ App.DynamicChannelName.process = function(client, Channel) {
                     
                     // Default to none
                     if (presence.currentName == 'wallpaper_engine') presence.currentName = '.none';
+                    if (presence.currentName == 'Spotify') presence.currentName = '.none';
                     
                     // If we have none, let's grab the default channel name
                     if (presence.currentName == '.none') presence.currentName = App.DynamicChannelName.defaultChannelName;
