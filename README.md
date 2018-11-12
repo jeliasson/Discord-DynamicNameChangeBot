@@ -30,5 +30,8 @@ node start
 ## Demo
 Join the [Demo Discord Guild](https://discord.gg/23qkAvh).
 
-## Contribute
+#### Contribute
 Feel free to contribute by forking and send your Pull Request!
+
+#### Donation
+Donate? [Click here](https://github.com/jeliasson/donations) :heart:
