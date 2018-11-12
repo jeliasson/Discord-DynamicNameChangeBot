@@ -1,4 +1,4 @@
-const VERSION = '0.4.7';
+const VERSION = '0.4.8';
 
 var Discord = require('discord.js');
 var env = require('node-env-file');
@@ -292,11 +292,11 @@ App.DynamicChannelName.process = function(client, Channel) {
                     if (presence.currentName == 'iexplore') presence.currentName = 'Silly Goose!';
                     if (presence.currentName == 'Project Argo (Prototype)') presence.currentName = 'Argo';
                     if (presence.currentName == 'Unity') presence.currentName = 'Programming';
-                    
+
                     // Default to none
                     if (presence.currentName == 'wallpaper_engine') presence.currentName = '.none';
                     if (presence.currentName == 'Spotify') presence.currentName = '.none';
-                    
+
                     // If we have none, let's grab the default channel name
                     if (presence.currentName == '.none') presence.currentName = App.DynamicChannelName.defaultChannelName;
 
