@@ -1,7 +1,7 @@
 {
   "name": "discord-dynamicnamechange",
-  "version": "0.4.7",
-  "description": "",
+  "version": "0.5.0",
+  "description": "This is a Discord Bot using Discord.js. It will, as the name suggest, dynamically change Voice Channel's name based on the over presence.",
   "main": "app.js",
   "dependencies": {
     "bufferutil": "^3.0.2",
