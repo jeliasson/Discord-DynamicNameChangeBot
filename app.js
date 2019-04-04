@@ -289,6 +289,8 @@ App.DynamicChannelName.process = function(client, Channel) {
                     (presence.highestProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage-1 && channelParticipants >= 2)
                 ) {
                     // Let's do some presence rewrite, if nessesary
+                    if (presence.currentName == 'Tom Clancy\'s The Division 2') presence.currentName = 'The Division 2';
+                    
                     if (presence.currentName == 'iexplore') presence.currentName = 'Silly Goose!';
                     if (presence.currentName == 'Project Argo (Prototype)') presence.currentName = 'Argo';
                     if (presence.currentName == 'Unity') presence.currentName = 'Programming';
