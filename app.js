@@ -1,4 +1,4 @@
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 var Discord = require('discord.js');
 var env = require('node-env-file');
@@ -11,370 +11,391 @@ var checksum = require('checksum');
 var path = require('path');
 
 var App = {
+	// Discord
+	Discord: {
+		presence: 'Hotel', // Presence to display on the bot
+		client: {},
+	},
 
-    // Discord
-    Discord: {
-        presence: 'Hotel',                        // Presence to display on the bot
-        client: {},
-    },
+	// Dynamic Channel Name
+	DynamicChannelName: {
+		enabled: true, // Enable Dynamic Channel Name (dry-run or not)
+		channelPrefix: '~ ', // Only process channels with this prefix
+		defaultChannelName: 'Room', // Default channel name
+		defaultChannelNameEmpty: 'Room', // Default empty channel name
+		minPresenceDominanceProcentage: 50, // Minimum procentage condition before changing channel name
+		minParticipant: 0, // Minimum of participant in a channel before changing channel name
+		maxChannelSpawn: 10, // @todo
+		maxChannelNameLength: 14, // Maximum generated channel name length (excluding prefix and room number)
+	},
 
-    // Dynamic Channel Name
-    DynamicChannelName: {
-        enabled: true,                         // Enable Dynamic Channel Name (dry-run or not)
-        channelPrefix: '~ ',                    // Only process channels with this prefix
-        defaultChannelName: 'Room',             // Default channel name
-        defaultChannelNameEmpty: 'Room',        // Default empty channel name
-        minPresenceDominanceProcentage: 50,     // Minimum procentage condition before changing channel name
-        minParticipant: 0,                      // Minimum of participant in a channel before changing channel name
-        maxChannelSpawn: 10,                    // @todo
-        maxChannelNameLength: 14,               // Maximum generated channel name length (excluding prefix and room number)
-    },
+	// Logger
+	logger: {
+		enabled: true,
+		service: {
+			discord: {
+				enabled: true, // Log to Discord
+				channel: 'bot-log', // Log to text channel name
+			},
+		},
+	},
 
-    // Logger
-    logger: {
-        enabled: true,
-        service: {
-            discord: {
-                enabled: true,                  // Log to Discord
-                channel: 'bot-log'              // Log to text channel name
-            }
-        }
-    },
+	// Instance
+	instance: {
+		keepalive: {
+			enabled: true,
+			interval: 60,
+		},
+	},
 
-    // Instance
-    instance: {
-        keepalive: {
-            enabled: true,
-            interval: 60
-        }
-    },
+	version: VERSION,
 
-    version: VERSION,
+	// Run
+	run: function(options, callback) {
+		// Setup Application
+		App.setup();
 
-    // Run
-    run: function(options, callback) {
+		// Construct Discord.client()
+		App.Discord.client = new Discord.Client();
 
-        // Setup Application
-        App.setup();
+		// Discord token
+		App.Discord.token = process.env.DISCORD_TOKEN ? process.env.DISCORD_TOKEN : false;
 
-        // Construct Discord.client()
-        App.Discord.client = new Discord.Client();
+		if (!App.Discord.token) {
+			App.log('!! Discord token is not defined (DISCORD_TOKEN).');
 
-        // Discord token
-        App.Discord.token = (process.env.DISCORD_TOKEN) ? process.env.DISCORD_TOKEN : false;
+			process.exit();
+		}
 
-        if (!App.Discord.token) {
-            App.log('!! Discord token is not defined (DISCORD_TOKEN).');
+		// Login using token
+		App.Discord.client.login(App.Discord.token);
 
-            process.exit();
-        }
+		// Client ready
+		App.Discord.client.on('ready', function() {
+			App.log('** Discord is ready (' + App.Discord.client.user.tag + ')');
 
-        // Login using token
-        App.Discord.client.login(App.Discord.token);
+			// Set App.Discord.client information
+			App.Discord.client.user.setActivity(App.Discord.presence);
 
-        // Client ready
-        App.Discord.client.on('ready', function() {
-            App.log('** Discord is ready (' + App.Discord.client.user.tag + ')');
+			// Run callback
+			if (typeof callback == 'function') {
+				callback(options);
+			}
+		});
 
-            // Set App.Discord.client information
-            App.Discord.client.user.setGame(App.Discord.presence);
+		/*
+		 * Presence Event
+		 */
+		App.Discord.client.on('presenceUpdate', function(statusBefore, statusAfter) {
+			App.DynamicChannelName.process(App.Discord.client, statusAfter);
+		});
 
-            // Run callback
-            if (typeof callback == "function") {
-                callback(options);
-            }
-        });
+		/*
+		 * Voice Event
+		 */
+		App.Discord.client.on('voiceStateUpdate', function(VoiceChannel, User) {
+			App.DynamicChannelName.process(App.Discord.client, VoiceChannel);
+		});
 
-        /*
-         * Presence Event
-         */
-        App.Discord.client.on('presenceUpdate', function(statusBefore, statusAfter) {
+		/*
+		 * Message Event
+		 */
+		App.Discord.client.on('message', function(message) {
+			App.handleMessage(App.Discord.client, message);
+		});
+	},
 
-            App.DynamicChannelName.process(App.Discord.client, statusAfter);
-        });
+	setup: function() {
+		// Only run once
+		if (isset(App.Discord.setupCompleted)) return;
 
-        /*
-         * Voice Event
-         */
-         App.Discord.client.on('voiceStateUpdate', function(VoiceChannel, User) {
+		// Process environment variables
+		env(__dirname + '/.env');
 
-             App.DynamicChannelName.process(App.Discord.client, VoiceChannel);
-         });
+		// Application logger
+		App.log = function(data = null, options = null) {
+			options = Object.assign(
+				{},
+				{
+					discord: false,
+				},
+				options,
+			);
 
-        /*
-         * Message Event
-         */
-        App.Discord.client.on('message', function (message) {
+			// Log
+			console.log(data);
 
-            App.handleMessage(App.Discord.client, message);
-        });
+			// Discord logging
+			if (isset(App.channelProcessingisReady) && App.logger.service.discord.enabled && options.discord)
+				App.logger.service.discord.channelObject.sendMessage(data, {});
+		};
 
-    },
+		App.log('** Starting instance');
 
-    setup: function() {
+		// Application file name
+		App.instance.file = path.basename(__filename);
 
-        // Only run once
-        if (isset(App.Discord.setupCompleted)) return;
+		// Application instance id
+		App.instance.id = '#' + md5(rs()).substring(0, 5);
 
-        // Process environment variables
-        env(__dirname + '/.env');
+		// Application checksum
+		App.instance.checksum = checksum.file(path.basename(__filename), function(err, checksum) {
+			if (err) App.log(err);
+			App.instance.checksum = checksum;
 
-        // Application logger
-        App.log = function (data = null, options = null) {
-            options = Object.assign({}, {
-                discord : false
-            }, options);
+			App.log('** Instance id ' + App.instance.id + ' (Checksum: ' + App.instance.checksum + ')');
+		});
 
-            // Log
-            console.log(data);
+		// Application uptime
+		App.instance.uptime = 0;
+		setInterval(function() {
+			App.instance.uptime = Math.round(uptimer.getAppUptime(), 0) + ' seconds';
+		}, 1000);
 
-            // Discord logging
-            if (isset(App.channelProcessingisReady) && App.logger.service.discord.enabled && options.discord)
-                App.logger.service.discord.channelObject.sendMessage(data, { });
-        };
+		// Keep-alive
+		App.instance.keepalive.count = 0;
+		setInterval(function() {
+			if (App.instance.keepalive.enabled) {
+				App.instance.keepalive.count++;
+				App.log('** Keep-Alive ' + App.instance.keepalive.count + ' count/' + App.instance.keepalive.interval + ' sec.');
+			}
+		}, App.instance.keepalive.interval * 1000);
 
-        App.log('** Starting instance');
+		App.instance.setupCompleted = true;
+	},
 
-        // Application file name
-        App.instance.file = path.basename(__filename);
+	// Handle Messages
+	handleMessage: function(client, message) {
+		// Block messages from log channel
+		if (message.channel.name == App.logger.service.discord.channel) return;
 
-        // Application instance id
-        App.instance.id = '#' + md5(rs()).substring(0, 5);
+		// Log inlogging message
+		App.log('[MESSAGE] ' + message.author.username + ' in ' + message.channel.name + ': ' + message.content);
 
-        // Application checksum
-        App.instance.checksum = checksum.file(path.basename(__filename), function(err, checksum) {
-            if (err) App.log(err);
-            App.instance.checksum = checksum;
+		// Help
+		if (message.content === 'help') {
+			message.reply('[' + App.instance.id + '] Available commands: ping, uptime, restart, debug');
 
-            App.log('** Instance id ' + App.instance.id + ' (Checksum: ' + App.instance.checksum + ')');
-        });
+			return;
+		}
 
-        // Application uptime
-        App.instance.uptime = 0;
-        setInterval(function() {
-            App.instance.uptime = Math.round(uptimer.getAppUptime(), 0) + ' seconds';
-        }, 1000);
+		// Ping
+		if (message.content === 'ping') {
+			message.reply('[' + App.instance.id + '] Pong!');
 
-        // Keep-alive
-        App.instance.keepalive.count = 0;
-        setInterval(function() {
-            if (App.instance.keepalive.enabled) {
-                App.instance.keepalive.count++;
-                App.log('** Keep-Alive ' + App.instance.keepalive.count + ' count/' + App.instance.keepalive.interval + ' sec.');
-            }
-        }, (App.instance.keepalive.interval * 1000));
+			return;
+		}
 
-        App.instance.setupCompleted = true;
-    },
+		// Uptime
+		if (message.content === 'uptime') {
+			message.reply('[' + App.instance.id + '] ' + App.instance.uptime);
 
-    // Handle Messages
-    handleMessage: function(client, message) {
+			return;
+		}
 
-        // Block messages from log channel
-        if (message.channel.name == App.logger.service.discord.channel) return;
+		// Debug
+		if (message.content === 'debug') {
+			message.reply(
+				'[' +
+					App.instance.id +
+					'] ' +
+					' Debug Information\n========================================\n\n:: App\nVersion: ' +
+					App.version +
+					'\n\n:: Instance\nId: ' +
+					App.instance.id +
+					'\nFile: ' +
+					App.instance.file +
+					'\nChecksum: ' +
+					App.instance.checksum +
+					'\nUptime = ' +
+					App.instance.uptime +
+					'\nKeep-Alive Count: ' +
+					App.instance.keepalive.count +
+					'\nKeep-Alive Interval: ' +
+					App.instance.keepalive.interval +
+					'\n\n:: Environment\nComputer Name: ' +
+					process.env.COMPUTERNAME +
+					'\n\n========================================',
+			);
 
-        // Log inlogging message
-        App.log('[MESSAGE] ' + message.author.username + ' in ' + message.channel.name + ': ' + message.content);
+			return;
+		}
 
-        // Help
-        if (message.content === 'help') {
-            message.reply('[' + App.instance.id + '] Available commands: ping, uptime, restart, debug');
+		// Restart
+		if (message.content === 'restart') {
+			message.reply(
+				'[' +
+					App.instance.id +
+					'] ' +
+					' Restarting...\n===============================\nYou may want to repool by requesting http://jeliasson-discord-bot.azurewebsites.net/',
+			);
 
-            return;
-        }
+			// Destory (logout App.Discord.client)
+			App.Discord.client.destroy();
 
-        // Ping
-        if (message.content === 'ping') {
-            message.reply('[' + App.instance.id + '] Pong!');
+			// Delay reboot
+			setTimeout(function() {
+				App.run();
+			}, 3000);
 
-            return;
-        }
-
-        // Uptime
-        if (message.content === 'uptime') {
-            message.reply('[' + App.instance.id + '] ' + App.instance.uptime);
-
-            return;
-        }
-
-        // Debug
-        if (message.content === 'debug') {
-            message.reply('[' + App.instance.id + '] ' + ' Debug Information\n========================================\n\n:: App\nVersion: ' + App.version + '\n\n:: Instance\nId: ' + App.instance.id + '\nFile: ' + App.instance.file + '\nChecksum: ' + App.instance.checksum + '\nUptime = ' + App.instance.uptime + '\nKeep-Alive Count: ' + App.instance.keepalive.count + '\nKeep-Alive Interval: ' + App.instance.keepalive.interval + '\n\n:: Environment\nComputer Name: ' + process.env.COMPUTERNAME + '\n\n========================================');
-
-            return;
-        }
-
-        // Restart
-        if (message.content === 'restart') {
-            message.reply('[' + App.instance.id + '] ' + ' Restarting...\n===============================\nYou may want to repool by requesting http://jeliasson-discord-bot.azurewebsites.net/');
-
-            // Destory (logout App.Discord.client)
-            App.Discord.client.destroy();
-
-            // Delay reboot
-            setTimeout(function() {
-                App.run();
-            }, 3000);
-
-            return;
-        }
-    }
+			return;
+		}
+	},
 };
 
 /*
  * Process Dynamic Channel Name with presence
  */
 App.DynamicChannelName.process = function(client, Channel) {
+	var presence = {};
+	presence.totals = [];
+	presence.totalChannels = 0;
 
-    var presence = {};
-    presence.totals = [];
-    presence.totalChannels = 0;
+	// Process all channels in the guild
+	App.Discord.client.channels.forEach(function(channel) {
+		// Voice Channels
+		if (channel.type == 'voice') {
+			// Match channel against channel prefix (filter)
+			if (channel.name.startsWith(App.DynamicChannelName.channelPrefix)) {
+				presence.stats = [];
+				presence.totalChannels++;
+				App.log('\nDCN: Processing channel ' + channel.name + '...');
 
-    // Process all channels in the guild
-    App.Discord.client.channels.forEach(function(channel) {
+				// Get channel presences
+				var channelParticipants = 0;
+				channel.members.forEach(function(member) {
+					channelParticipants++;
 
-        // Voice Channels
-        if (channel.type == 'voice') {
+					// Ugly hack to get presence of the current user, and add stats into an array.
+					member.guild.presences.forEach(function(Presence, userId) {
+						if (member.user.id === userId) {
+							if (isset(Presence.game)) {
+								presence.stats[Presence.game.name] = isset(presence.stats[Presence.game.name])
+									? presence.stats[Presence.game.name] + 1
+									: 1;
+							} else {
+								presence.stats['.none'] = isset(presence.stats['.none']) ? presence.stats['.none'] + 1 : 1;
+							}
+						}
+					});
+				});
 
-            // Match channel against channel prefix (filter)
-            if (channel.name.startsWith(App.DynamicChannelName.channelPrefix)) {
-                presence.stats = [];
-                presence.totalChannels++;
-                App.log('\nDCN: Processing channel ' + channel.name + '...');
+				// Get top presence
+				presence.currentName = '';
+				presence.currentProcentage = 0;
+				presence.highestName = '';
+				presence.highestProcentage = 0;
+				for (presence.currentName in presence.stats) {
+					presence.currentProcentage = Math.round((presence.stats[presence.currentName] / channelParticipants) * 100, 1);
+					if (presence.currentProcentage > presence.highestProcentage && presence.currentName != '.none') {
+						presence.highestProcentage = presence.currentProcentage;
+						presence.highestName = presence.currentName;
+					}
+				}
+				presence.currentName = presence.highestName;
 
-                // Get channel presences
-                var channelParticipants = 0;
-                channel.members.forEach(function(member) {
-                    channelParticipants++;
+				// Channel name suggestion
+				var suggestion = {};
+				suggestion.channelPrefix = App.DynamicChannelName.channelPrefix;
+				suggestion.channelName = '';
+				suggestion.channelNumber = '';
 
-                    // Ugly hack to get presence of the current user, and add stats into an array.
-                    member.guild.presences.forEach(function(Presence, userId) {
-                        if (member.user.id === userId) {
-                            if (isset(Presence.game)) {
-                                presence.stats[Presence.game.name] = isset(presence.stats[Presence.game.name]) ? presence.stats[Presence.game.name]+1 : 1;
-                            } else {
-                                presence.stats['.none'] = isset(presence.stats['.none']) ? presence.stats['.none']+1 : 1;
-                            }
-                        }
-                    });
-                });
+				// 0 channel participants (don't know if this will ever run).
+				if (channelParticipants === 0) {
+					suggestion.channelName = App.DynamicChannelName.defaultChannelNameEmpty;
+				} else if (
+					// If presence is meeting target procentage, handle 2 participants.
+					presence.highestProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage ||
+					(presence.highestProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage - 1 && channelParticipants >= 2)
+				) {
+					// Let's do some presence rewrite, if nessesary
+					if (presence.currentName == "Tom Clancy's The Division 2") presence.currentName = 'The Division 2';
 
-                // Get top presence
-                presence.currentName = '';
-                presence.currentProcentage = 0;
-                presence.highestName = '';
-                presence.highestProcentage = 0;
-                for (presence.currentName in presence.stats) {
-                    presence.currentProcentage = Math.round((presence.stats[presence.currentName] / channelParticipants) * 100, 1);
-                    if (presence.currentProcentage > presence.highestProcentage && presence.currentName != '.none') {
-                        presence.highestProcentage = presence.currentProcentage;
-                        presence.highestName = presence.currentName;
-                    }
-                }
-                presence.currentName = presence.highestName;
+					if (presence.currentName == 'iexplore') presence.currentName = 'Silly Goose!';
+					if (presence.currentName == 'Project Argo (Prototype)') presence.currentName = 'Argo';
+					if (presence.currentName == 'Unity') presence.currentName = 'Programming';
 
-                // Channel name suggestion
-                var suggestion = {};
-                suggestion.channelPrefix = App.DynamicChannelName.channelPrefix;
-                suggestion.channelName = '';
-                suggestion.channelNumber = '';
+					// Default to none
+					if (presence.currentName == 'wallpaper_engine') presence.currentName = '.none';
+					if (presence.currentName == 'Spotify') presence.currentName = '.none';
 
-                // 0 channel participants (don't know if this will ever run).
-                if (channelParticipants === 0) {
-                    suggestion.channelName = App.DynamicChannelName.defaultChannelNameEmpty;
-                } else if (
-                    // If presence is meeting target procentage, handle 2 participants.
-                    (presence.highestProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage)
-                    ||
-                    (presence.highestProcentage >= App.DynamicChannelName.minPresenceDominanceProcentage-1 && channelParticipants >= 2)
-                ) {
-                    // Let's do some presence rewrite, if nessesary
-                    if (presence.currentName == 'Tom Clancy\'s The Division 2') presence.currentName = 'The Division 2';
-                    
-                    if (presence.currentName == 'iexplore') presence.currentName = 'Silly Goose!';
-                    if (presence.currentName == 'Project Argo (Prototype)') presence.currentName = 'Argo';
-                    if (presence.currentName == 'Unity') presence.currentName = 'Programming';
+					// If we have none, let's grab the default channel name
+					if (presence.currentName == '.none') presence.currentName = App.DynamicChannelName.defaultChannelName;
 
-                    // Default to none
-                    if (presence.currentName == 'wallpaper_engine') presence.currentName = '.none';
-                    if (presence.currentName == 'Spotify') presence.currentName = '.none';
+					suggestion.channelName = presence.currentName;
+				} else if (presence.currentName == '.none') {
+					// Zero presene
+					suggestion.channelName = App.DynamicChannelName.defaultChannelName;
+				} else {
+					// Do nothing
+					suggestion.channelName = App.DynamicChannelName.defaultChannelName;
+				}
 
-                    // If we have none, let's grab the default channel name
-                    if (presence.currentName == '.none') presence.currentName = App.DynamicChannelName.defaultChannelName;
+				// Make channel name shorter if nessesary
+				suggestion.channelName =
+					suggestion.channelName.length > App.DynamicChannelName.maxChannelNameLength
+						? suggestion.channelName.substring(0, App.DynamicChannelName.maxChannelNameLength) + '...'
+						: suggestion.channelName;
 
-                    suggestion.channelName = presence.currentName;
+				// Final name generator
+				var nameGenerator = {};
+				nameGenerator.run = true;
+				nameGenerator.count = 0;
+				while (nameGenerator.run) {
+					nameGenerator.count++;
 
-                } else if (presence.currentName == '.none') {
-                    // Zero presene
-                    suggestion.channelName = App.DynamicChannelName.defaultChannelName;
-                } else {
-                    // Do nothing
-                    suggestion.channelName = App.DynamicChannelName.defaultChannelName;
-                }
+					// Channel Number
+					if (nameGenerator.count > 1) {
+						suggestion.channelNumber = nameGenerator.count < 10 ? '0' + nameGenerator.count : nameGenerator.count;
+					}
 
-                // Make channel name shorter if nessesary
-                suggestion.channelName = (suggestion.channelName.length > App.DynamicChannelName.maxChannelNameLength) ? suggestion.channelName.substring(0, App.DynamicChannelName.maxChannelNameLength) + '...' : suggestion.channelName;
+					// Default channel room
+					suggestion.channelNumber = '(' + App.DynamicChannelName.defaultChannelName + ' ' + presence.totalChannels + ')';
 
-                // Final name generator
-                var nameGenerator = {};
-                nameGenerator.run = true;
-                nameGenerator.count = 0;
-                while (nameGenerator.run) {
-                    nameGenerator.count++;
+					// Override defualt channel rooms
+					if (suggestion.channelName == App.DynamicChannelName.defaultChannelName) {
+						suggestion.channelNumber = presence.totalChannels;
+					}
 
-                    // Channel Number
-                    if (nameGenerator.count > 1) {
-                        suggestion.channelNumber = ((nameGenerator.count < 10) ? ("0" + nameGenerator.count) : nameGenerator.count);
-                    }
+					// Final suggestion to evaluate
+					suggestion.final = suggestion.channelPrefix + ' ' + suggestion.channelName + ' ' + suggestion.channelNumber;
+					if (presence.totals.indexOf(suggestion.final) <= -1) {
+						presence.totals.push(suggestion.final);
+						nameGenerator.run = false;
 
-                    // Default channel room
-                    suggestion.channelNumber = '(' + App.DynamicChannelName.defaultChannelName + ' ' + presence.totalChannels + ')';
+						break;
+					}
 
-                    // Override defualt channel rooms
-                    if (suggestion.channelName == App.DynamicChannelName.defaultChannelName) {
-                        suggestion.channelNumber = presence.totalChannels;
-                    }
+					// Break out if we have tried more than max channel spawn count
+					if (nameGenerator.count > App.DynamicChannelName.maxChannelSpawn) break;
+				}
 
-                    // Final suggestion to evaluate
-                    suggestion.final = suggestion.channelPrefix + ' ' + suggestion.channelName + ' ' + suggestion.channelNumber;
-                    if (presence.totals.indexOf(suggestion.final) <= -1) {
-                        presence.totals.push(suggestion.final);
-                        nameGenerator.run = false;
+				//console.log(suggestion, presence);
 
-                        break;
-                    }
+				if (App.DynamicChannelName.enabled && channel.name != suggestion.final) {
+					App.log("DCN: Changing channel name to '" + suggestion.final + "'");
+					App.log("DCN: Changing channel name from '" + channel.name + "' to '" + suggestion.final + "'.\n", {
+						discord: false,
+					});
 
-                    // Break out if we have tried more than max channel spawn count
-                    if (nameGenerator.count > App.DynamicChannelName.maxChannelSpawn) break;
-                }
+					// Change the channel name
+					channel.setName(suggestion.final);
+				} else if (App.DynamicChannelName.enabled && channel.name == suggestion.final) {
+					App.log('DCN: Channel name is already per suggestion: ' + suggestion.final + "'");
+				} else {
+					App.log("DCN: Suggesting changing channel name to '" + suggestion.final + "'");
+				}
+			}
+		}
 
-                //console.log(suggestion, presence);
-
-                if (App.DynamicChannelName.enabled && channel.name != suggestion.final) {
-                    App.log('DCN: Changing channel name to \'' + suggestion.final + '\'');
-                    App.log('DCN: Changing channel name from \'' + channel.name + '\' to \'' + suggestion.final + '\'.\n', {
-                        discord: false
-                    });
-
-                    // Change the channel name
-                    channel.setName(suggestion.final);
-                } else if (App.DynamicChannelName.enabled && channel.name == suggestion.final) {
-                    App.log('DCN: Channel name is already per suggestion: ' + suggestion.final + '\'');
-                } else {
-                    App.log('DCN: Suggesting changing channel name to \'' + suggestion.final + '\'');
-                }
-            }
-        }
-
-        // Voice Channels
-        if (channel.type == 'text') {
-
-            // Match and save Discord logging channel
-            if (channel.name.startsWith(App.logger.service.discord.channel)) {
-                App.logger.service.discord.channelObject = channel;
-            }
-        }
-    });
+		// Voice Channels
+		if (channel.type == 'text') {
+			// Match and save Discord logging channel
+			if (channel.name.startsWith(App.logger.service.discord.channel)) {
+				App.logger.service.discord.channelObject = channel;
+			}
+		}
+	});
 };
 
 // Run Application
