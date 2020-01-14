@@ -4,8 +4,8 @@ WORKDIR /app
 COPY .env .
 COPY app.js .
 COPY package-lock.json .
-COPY package.json .
+COPY yarn.lock .
 
-RUN npm install
+RUN yarn install --frozen-lockfile
 
 ENTRYPOINT [ "node", "app.js" ]
